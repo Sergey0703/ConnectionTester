@@ -1,382 +1,316 @@
 import * as React from 'react';
-import { useState, useEffect } from 'react';
-import { BaseService, ISiteInfo, IListCheckResult } from '../../../services/BaseService';
-import { WebPartContext } from '@microsoft/sp-webpart-base';
-import { 
-  PrimaryButton, 
-  DefaultButton,
-  MessageBar, 
-  MessageBarType, 
-  Spinner, 
-  SpinnerSize,
-  DetailsList,
-  DetailsListLayoutMode,
-  IColumn,
-  SelectionMode,
-  TextField,
-  Stack,
-  StackItem,
-  Dialog,
-  DialogType,
-  DialogFooter
-} from '@fluentui/react';
+import styles from './ConnectionTest.module.scss';
+import { BaseService, ISiteInfo, IListCheckResult, IListInfo, IListItem } from '../../../services/BaseService';
+import { IConnectionTestProps } from './IConnectionTestProps';
+import { IConnectionTestState } from './IConnectionTestState';
+import { escape } from '@microsoft/sp-lodash-subset';
+import { PrimaryButton, DefaultButton, TextField, Stack, StackItem, Label, Spinner, SpinnerSize, MessageBar, MessageBarType } from 'office-ui-fabric-react';
 
-export interface IConnectionTestProps {
-  context: WebPartContext;
-}
-
-// Интерфейс для элементов списка в DetailsList
-interface IListItem {
-  name: string;
-  status: string;
-  itemCount: string | number;
-  details: string;
-}
-
-export const ConnectionTest: React.FC<IConnectionTestProps> = (props) => {
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [siteInfo, setSiteInfo] = useState<ISiteInfo | null>(null);
-  const [listsInfo, setListsInfo] = useState<IListCheckResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [customListName, setCustomListName] = useState<string>('');
-  const [prevSiteUrl, setPrevSiteUrl] = useState<string>('');
-  const [baseService, setBaseService] = useState<BaseService | null>(null);
-  const [selectedList, setSelectedList] = useState<string | null>(null);
-  const [isDialogVisible, setIsDialogVisible] = useState<boolean>(false);
-  const [newTitleValue, setNewTitleValue] = useState<string>('Test');
-  const [updateSuccess, setUpdateSuccess] = useState<string | null>(null);
-
-  useEffect(() => {
-    const service = new BaseService(props.context, "ConnectionTest");
-    setBaseService(service);
+export default class ConnectionTest extends React.Component<IConnectionTestProps, IConnectionTestState> {
+  private _baseService: BaseService;
+  
+  constructor(props: IConnectionTestProps) {
+    super(props);
+    // Инициализация сервиса
+    this._baseService = new BaseService(this.props.context, "ConnectionTest");
     
-    // Используем публичный метод для получения URL вместо прямого доступа к полю
-    if (service) {
-      setPrevSiteUrl(service.getPrevSiteUrl());
-    }
-  }, [props.context]);
+    // Инициализация состояния
+    this.state = {
+      loading: false,
+      error: null,
+      prevSiteUrl: this._baseService.getPrevSiteUrl(),
+      siteInfo: null,
+      listsCheckResult: null,
+      updateStatus: null,
+      updateTitle: "",
+      listTitle: "Staff",
+      updatedItem: null
+    };
+  }
 
-  // Тестирование подключения к сайту
-  const handleTestConnection = async (): Promise<void> => {
-    if (!baseService) return;
-
-    setIsLoading(true);
-    setSiteInfo(null);
-    setError(null);
-    setUpdateSuccess(null);
-
-    try {
-      const webInfo = await baseService.testPrevSiteConnection();
-      setSiteInfo(webInfo);
-    } catch (err) {
-      console.error("Connection test failed:", err);
-      setError(`Connection test failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Проверка доступности списков
-  const handleCheckLists = async (): Promise<void> => {
-    if (!baseService) return;
-
-    setIsLoading(true);
-    setListsInfo(null);
-    setError(null);
-    setUpdateSuccess(null);
-    setSelectedList(null);
-
-    try {
-      const results = await baseService.checkAllRequiredLists();
-      setListsInfo(results);
-    } catch (err) {
-      console.error("List check failed:", err);
-      setError(`List check failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Проверка пользовательского списка
-  const handleCheckCustomList = async (): Promise<void> => {
-    if (!baseService) return;
+  public render(): React.ReactElement<IConnectionTestProps> {
+    const { loading, error, prevSiteUrl, siteInfo, listsCheckResult, updateStatus, updatedItem } = this.state;
     
-    if (!customListName.trim()) {
-      setError("Please enter a list name");
+    return (
+      <div className={styles.connectionTest}>
+        <div className={styles.container}>
+          <div className={styles.row}>
+            <div className={styles.column}>
+              <h2>Тестирование подключения к удаленному сайту</h2>
+              <p>Этот инструмент проверяет возможность подключения к удаленному сайту SharePoint через Graph API.</p>
+              
+              {/* URL удаленного сайта */}
+              <Label>URL удаленного сайта:</Label>
+              <TextField 
+                readOnly
+                value={prevSiteUrl}
+                className={styles.textField}
+              />
+              
+              <Stack horizontal tokens={{ childrenGap: 10 }} className={styles.buttonContainer}>
+                {/* Кнопка проверки подключения */}
+                <PrimaryButton 
+                  text="Проверить подключение"
+                  onClick={this._testConnection}
+                  disabled={loading}
+                />
+                
+                {/* Кнопка проверки списков */}
+                <DefaultButton 
+                  text="Проверить списки"
+                  onClick={this._checkLists}
+                  disabled={loading || !siteInfo}
+                />
+              </Stack>
+              
+              {/* Секция обновления элемента списка */}
+              <div className={styles.updateSection}>
+                <h3>Обновление элемента списка</h3>
+                <Stack tokens={{ childrenGap: 10 }}>
+                  <StackItem>
+                    <Label>Название списка:</Label>
+                    <TextField 
+                      value={this.state.listTitle}
+                      onChange={this._onListTitleChange}
+                      className={styles.textField}
+                    />
+                  </StackItem>
+                  <StackItem>
+                    <Label>Новое значение Title:</Label>
+                    <TextField 
+                      value={this.state.updateTitle}
+                      onChange={this._onUpdateTitleChange}
+                      className={styles.textField}
+                    />
+                  </StackItem>
+                  <StackItem>
+                    <PrimaryButton 
+                      text="Обновить элемент"
+                      onClick={this._updateItem}
+                      disabled={loading || !siteInfo || !this.state.updateTitle}
+                    />
+                  </StackItem>
+                </Stack>
+              </div>
+              
+              {/* Отображение индикатора загрузки */}
+              {loading && (
+                <div className={styles.spinner}>
+                  <Spinner size={SpinnerSize.large} label="Загрузка..." />
+                </div>
+              )}
+              
+              {/* Отображение ошибок */}
+              {error && (
+                <MessageBar messageBarType={MessageBarType.error} className={styles.messageBar}>
+                  {error}
+                </MessageBar>
+              )}
+              
+              {/* Отображение информации о сайте */}
+              {siteInfo && !loading && (
+                <div className={styles.infoSection}>
+                  <h3>Информация о сайте</h3>
+                  <div className={styles.infoItem}>
+                    <strong>Название:</strong> {siteInfo.Title}
+                  </div>
+                  <div className={styles.infoItem}>
+                    <strong>URL:</strong> {siteInfo.Url}
+                  </div>
+                  <div className={styles.infoItem}>
+                    <strong>Дата создания:</strong> {new Date(siteInfo.Created).toLocaleString()}
+                  </div>
+                  <div className={styles.infoItem}>
+                    <strong>Последнее изменение:</strong> {new Date(siteInfo.LastItemModifiedDate).toLocaleString()}
+                  </div>
+                  {siteInfo.Description && (
+                    <div className={styles.infoItem}>
+                      <strong>Описание:</strong> {siteInfo.Description}
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Отображение результатов проверки списков */}
+              {listsCheckResult && !loading && (
+                <div className={styles.infoSection}>
+                  <h3>Проверка списков</h3>
+                  {Object.keys(listsCheckResult).map(listName => {
+                    const result = listsCheckResult[listName];
+                    return (
+                      <div key={listName} className={styles.listInfo}>
+                        <h4>{listName}</h4>
+                        {'error' in result ? (
+                          <MessageBar messageBarType={MessageBarType.error}>
+                            {result.error}
+                          </MessageBar>
+                        ) : (
+                          <div>
+                            <div className={styles.infoItem}>
+                              <strong>ID:</strong> {result.Id}
+                            </div>
+                            <div className={styles.infoItem}>
+                              <strong>Количество элементов:</strong> {result.ItemCount}
+                            </div>
+                            {result.Description && (
+                              <div className={styles.infoItem}>
+                                <strong>Описание:</strong> {result.Description}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              
+              {/* Отображение статуса обновления */}
+              {updateStatus && (
+                <MessageBar 
+                  messageBarType={updateStatus.type} 
+                  className={styles.messageBar}
+                >
+                  {updateStatus.message}
+                </MessageBar>
+              )}
+              
+              {/* Отображение обновленного элемента */}
+              {updatedItem && !loading && (
+                <div className={styles.infoSection}>
+                  <h3>Обновленный элемент</h3>
+                  <div className={styles.infoItem}>
+                    <strong>ID:</strong> {updatedItem.Id}
+                  </div>
+                  <div className={styles.infoItem}>
+                    <strong>Title:</strong> {updatedItem.Title}
+                  </div>
+                  {Object.keys(updatedItem)
+                    .filter(key => key !== 'Id' && key !== 'Title' && typeof updatedItem[key] !== 'object')
+                    .map(key => (
+                      <div key={key} className={styles.infoItem}>
+                        <strong>{key}:</strong> {String(updatedItem[key])}
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /**
+   * Обработчик изменения названия списка
+   */
+  private _onListTitleChange = (event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>, newValue?: string): void => {
+    this.setState({ listTitle: newValue || "" });
+  }
+
+  /**
+   * Обработчик изменения значения для обновления
+   */
+  private _onUpdateTitleChange = (event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>, newValue?: string): void => {
+    this.setState({ updateTitle: newValue || "" });
+  }
+
+  /**
+   * Проверяет подключение к удаленному сайту
+   */
+  private _testConnection = async (): Promise<void> => {
+    this.setState({ 
+      loading: true, 
+      error: null, 
+      siteInfo: null,
+      listsCheckResult: null,
+      updateStatus: null,
+      updatedItem: null
+    });
+    
+    try {
+      const siteInfo = await this._baseService.testPrevSiteConnection();
+      this.setState({ 
+        siteInfo,
+        loading: false 
+      });
+    } catch (error) {
+      this.setState({ 
+        error: `Ошибка подключения: ${error instanceof Error ? error.message : String(error)}`,
+        loading: false 
+      });
+    }
+  }
+
+  /**
+   * Проверяет доступные списки на удаленном сайте
+   */
+  private _checkLists = async (): Promise<void> => {
+    this.setState({ 
+      loading: true, 
+      error: null,
+      listsCheckResult: null,
+      updateStatus: null,
+      updatedItem: null
+    });
+    
+    try {
+      const listsCheckResult = await this._baseService.checkAllRequiredLists();
+      this.setState({ 
+        listsCheckResult,
+        loading: false 
+      });
+    } catch (error) {
+      this.setState({ 
+        error: `Ошибка проверки списков: ${error instanceof Error ? error.message : String(error)}`,
+        loading: false 
+      });
+    }
+  }
+
+  /**
+   * Обновляет первый элемент в выбранном списке
+   */
+  private _updateItem = async (): Promise<void> => {
+    const { listTitle, updateTitle } = this.state;
+    
+    if (!updateTitle) {
+      this.setState({ 
+        updateStatus: {
+          type: MessageBarType.warning,
+          message: "Введите значение для обновления"
+        }
+      });
       return;
     }
-
-    setIsLoading(true);
-    setError(null);
-    setUpdateSuccess(null);
-    setSelectedList(null);
-
+    
+    this.setState({ 
+      loading: true,
+      error: null,
+      updateStatus: null,
+      updatedItem: null
+    });
+    
     try {
-      const listInfo = await baseService.checkListExists(customListName);
+      const updatedItem = await this._baseService.updateFirstItemTitleField(listTitle, updateTitle);
       
-      setListsInfo({ [customListName]: listInfo });
-    } catch (err) {
-      console.error(`List check failed for "${customListName}":`, err);
-      setError(`List check failed for "${customListName}": ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setIsLoading(false);
+      this.setState({ 
+        updatedItem,
+        updateStatus: {
+          type: MessageBarType.success,
+          message: `Элемент успешно обновлен в списке "${listTitle}"`
+        },
+        loading: false,
+        updateTitle: "" // Очищаем поле после успешного обновления
+      });
+    } catch (error) {
+      this.setState({ 
+        updateStatus: {
+          type: MessageBarType.error,
+          message: `Ошибка обновления элемента: ${error instanceof Error ? error.message : String(error)}`
+        },
+        loading: false 
+      });
     }
-  };
-
-  // Обновление поля Title первого элемента списка
-  const handleUpdateItemTitle = async (): Promise<void> => {
-    if (!baseService || !selectedList) return;
-
-    setIsDialogVisible(false);
-    setIsLoading(true);
-    setError(null);
-    setUpdateSuccess(null);
-
-    try {
-      // Обновляем поле Title первого элемента
-      await baseService.updateFirstItemTitleField(selectedList, newTitleValue);
-      
-      setUpdateSuccess(`Successfully updated Title field of the first item in list "${selectedList}" to "${newTitleValue}"`);
-      
-      // Обновляем списки для отображения актуальной информации
-      await handleCheckLists();
-      
-    } catch (err) {
-      console.error(`Item update failed for "${selectedList}":`, err);
-      setError(`Failed to update item Title: ${err instanceof Error ? err.message : String(err)}`);
-      setIsLoading(false);
-    }
-  };
-
-  // Обработчик выбора списка в DetailsList
-  const handleListSelection = (item?: IListItem): void => {
-    if (item && item.status === 'OK') {
-      setSelectedList(item.name);
-    } else {
-      setSelectedList(null);
-    }
-  };
-
-  // Обработчик открытия диалога подтверждения
-  const handleOpenUpdateDialog = (): void => {
-    if (selectedList) {
-      setNewTitleValue('Test');
-      setIsDialogVisible(true);
-    }
-  };
-
-  // Обработчик закрытия диалога
-  const handleCloseDialog = (): void => {
-    setIsDialogVisible(false);
-  };
-
-  // Колонки для таблицы списков
-  const columns: IColumn[] = [
-    {
-      key: 'listName',
-      name: 'List Name',
-      fieldName: 'name',
-      minWidth: 100,
-      maxWidth: 200,
-      isResizable: true
-    },
-    {
-      key: 'status',
-      name: 'Status',
-      fieldName: 'status',
-      minWidth: 100,
-      maxWidth: 100,
-      isResizable: true,
-      onRender: (item: IListItem) => (
-        <span style={{ 
-          color: item.status === 'OK' ? 'green' : 'red', 
-          fontWeight: 'bold' 
-        }}>
-          {item.status}
-        </span>
-      )
-    },
-    {
-      key: 'itemCount',
-      name: 'Item Count',
-      fieldName: 'itemCount',
-      minWidth: 100,
-      maxWidth: 100,
-      isResizable: true
-    },
-    {
-      key: 'details',
-      name: 'Details',
-      fieldName: 'details',
-      minWidth: 200,
-      isResizable: true
-    }
-  ];
-
-  // Преобразуем информацию о списках в формат для DetailsList
-  const getListItems = (): IListItem[] => {
-    if (!listsInfo) return [];
-
-    return Object.keys(listsInfo).map(listName => {
-      const info = listsInfo[listName];
-      
-      if ('error' in info) {
-        return {
-          name: listName,
-          status: 'Error',
-          itemCount: '-',
-          details: info.error
-        };
-      }
-      
-      return {
-        name: listName,
-        status: 'OK',
-        itemCount: info.ItemCount || 0,
-        details: `ID: ${info.Id}`
-      };
-    }) as IListItem[]; // Явное приведение типа здесь
-  };
-
-  return (
-    <div style={{ padding: '20px' }}>
-      <Stack tokens={{ childrenGap: 15 }}>
-        <h2>Previous Site Connection Test</h2>
-        
-        <Stack horizontal tokens={{ childrenGap: 10 }}>
-          <StackItem>
-            <TextField
-              label="Previous Site URL"
-              value={prevSiteUrl}
-              readOnly
-              styles={{ field: { width: 400 } }}
-            />
-          </StackItem>
-        </Stack>
-        
-        <Stack horizontal tokens={{ childrenGap: 10 }}>
-          <StackItem>
-            <PrimaryButton 
-              text="Test Connection" 
-              onClick={handleTestConnection}
-              disabled={isLoading}
-            />
-          </StackItem>
-          
-          <StackItem>
-            <DefaultButton 
-              text="Check Standard Lists" 
-              onClick={handleCheckLists}
-              disabled={isLoading}
-            />
-          </StackItem>
-        </Stack>
-
-        <Stack horizontal verticalAlign="end" tokens={{ childrenGap: 10 }}>
-          <StackItem grow>
-            <TextField 
-              label="Custom List Name" 
-              value={customListName}
-              onChange={(_, newValue) => setCustomListName(newValue || '')}
-              disabled={isLoading}
-              styles={{ root: { width: 200 } }}
-            />
-          </StackItem>
-          
-          <StackItem>
-            <DefaultButton 
-              text="Check Custom List" 
-              onClick={handleCheckCustomList}
-              disabled={isLoading || !customListName.trim()}
-            />
-          </StackItem>
-        </Stack>
-
-        {isLoading && (
-          <Stack>
-            <Spinner size={SpinnerSize.medium} label="Processing request..." />
-          </Stack>
-        )}
-
-        {error && (
-          <Stack>
-            <MessageBar messageBarType={MessageBarType.error}>
-              {error}
-            </MessageBar>
-          </Stack>
-        )}
-
-        {updateSuccess && (
-          <Stack>
-            <MessageBar messageBarType={MessageBarType.success}>
-              {updateSuccess}
-            </MessageBar>
-          </Stack>
-        )}
-
-        {siteInfo && (
-          <Stack tokens={{ padding: '10px 0' }}>
-            <MessageBar messageBarType={MessageBarType.success}>
-              Successfully connected to: {siteInfo.Title}
-            </MessageBar>
-            <div style={{ marginTop: '10px' }}>
-              <strong>Site URL:</strong> {siteInfo.Url}<br />
-              <strong>Site ID:</strong> {siteInfo.Id}<br />
-              <strong>Created:</strong> {new Date(siteInfo.Created).toLocaleString()}<br />
-              <strong>Last Modified:</strong> {new Date(siteInfo.LastItemModifiedDate).toLocaleString()}
-            </div>
-          </Stack>
-        )}
-
-        {listsInfo && (
-          <Stack>
-            <Stack horizontal horizontalAlign="space-between" verticalAlign="center">
-              <h3>List Check Results</h3>
-              <PrimaryButton
-                text="Set 'Test' in Title field of first item"
-                onClick={handleOpenUpdateDialog}
-                disabled={!selectedList || isLoading}
-              />
-            </Stack>
-            <DetailsList
-              items={getListItems()}
-              columns={columns}
-              layoutMode={DetailsListLayoutMode.fixedColumns}
-              selectionMode={SelectionMode.single}
-              isHeaderVisible={true}
-              onActiveItemChanged={handleListSelection}
-              getKey={(item) => item.name}
-            />
-            {selectedList && (
-              <MessageBar messageBarType={MessageBarType.info}>
-                Selected list: {selectedList}
-              </MessageBar>
-            )}
-          </Stack>
-        )}
-      </Stack>
-
-      <Dialog
-        hidden={!isDialogVisible}
-        onDismiss={handleCloseDialog}
-        dialogContentProps={{
-          type: DialogType.normal,
-          title: 'Confirm Item Update',
-          subText: `Are you sure you want to update the Title field of the first item in list "${selectedList}" to "${newTitleValue}"? This operation cannot be undone.`
-        }}
-      >
-        <Stack tokens={{ childrenGap: 15, padding: '0 0 10px 0' }}>
-          <TextField
-            label="New Title value"
-            value={newTitleValue}
-            onChange={(_, value) => setNewTitleValue(value || 'Test')}
-          />
-        </Stack>
-        <DialogFooter>
-          <PrimaryButton onClick={handleUpdateItemTitle} text="Update" />
-          <DefaultButton onClick={handleCloseDialog} text="Cancel" />
-        </DialogFooter>
-      </Dialog>
-    </div>
-  );
-};
+  }
+}

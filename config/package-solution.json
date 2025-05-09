@@ -32,6 +32,16 @@
         "id": "17edead0-a6c4-44a0-a12a-0a5bc9e28d0b",
         "version": "1.0.0.0"
       }
+    ],
+    "webApiPermissionRequests": [
+      {
+        "resource": "Microsoft Graph",
+        "scope": "Sites.Read.All"
+      },
+      {
+        "resource": "Microsoft Graph",
+        "scope": "Sites.ReadWrite.All"
+      }
     ]
   },
   "paths": {

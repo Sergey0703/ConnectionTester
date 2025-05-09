@@ -1,0 +1,91 @@
+.connectionTest {
+    .container {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 20px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      background-color: #ffffff;
+    }
+  
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      margin: 0 -8px;
+    }
+  
+    .column {
+      flex: 0 0 100%;
+      padding: 0 8px;
+    }
+  
+    .textField {
+      margin-bottom: 15px;
+      width: 100%;
+    }
+  
+    .buttonContainer {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 10px;
+    }
+  
+    .spinner {
+      margin: 20px 0;
+    }
+  
+    .messageBar {
+      margin: 15px 0;
+    }
+  
+    .infoSection {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #f3f2f1;
+      border-radius: 4px;
+    }
+  
+    .infoItem {
+      margin: 8px 0;
+      
+      strong {
+        margin-right: 5px;
+        font-weight: 600;
+      }
+    }
+  
+    .listInfo {
+      margin-bottom: 15px;
+      padding: 10px;
+      background-color: #ffffff;
+      border: 1px solid #e1dfdd;
+      border-radius: 4px;
+    }
+  
+    .updateSection {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #faf9f8;
+      border-radius: 4px;
+    }
+  
+    h2 {
+      font-size: 21px;
+      font-weight: 600;
+      color: #0078d4;
+      margin-bottom: 10px;
+    }
+  
+    h3 {
+      font-size: 17px;
+      font-weight: 600;
+      color: #0078d4;
+      margin-bottom: 10px;
+    }
+  
+    h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #106ebe;
+      margin-bottom: 8px;
+    }
+  }
