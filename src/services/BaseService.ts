@@ -5,9 +5,32 @@ import "@pnp/sp/webs";
 import "@pnp/sp/lists";
 import "@pnp/sp/items";
 
+// Интерфейс для информации о сайте
+export interface ISiteInfo {
+  Id: string;
+  Title: string;
+  Url: string;
+  Created: string;
+  LastItemModifiedDate: string;
+  [key: string]: any; // Для любых других свойств
+}
+
+// Интерфейс для информации о списке
+export interface IListInfo {
+  Id: string;
+  Title: string;
+  ItemCount: number;
+  [key: string]: any; // Для любых других свойств
+}
+
+// Интерфейс для результатов проверки списков
+export interface IListCheckResult {
+  [listName: string]: IListInfo | { error: string };
+}
+
 export class BaseService {
   protected _sp: SPFI;
-  protected _prevSiteSp: SPFI; // Убираем null
+  protected _prevSiteSp: SPFI;
   protected _logSource: string;
   
   // Замените на URL вашего предыдущего сайта
@@ -36,7 +59,7 @@ export class BaseService {
    * Проверяет соединение с предыдущим сайтом
    * @returns Promise с информацией о веб-сайте
    */
-  public async testPrevSiteConnection(): Promise<any> {
+  public async testPrevSiteConnection(): Promise<ISiteInfo> {
     try {
       const webInfo = await this._prevSiteSp.web();
       this.logInfo(`Successfully connected to previous site: ${webInfo.Title}`);
@@ -52,7 +75,7 @@ export class BaseService {
    * @param listTitle Название списка для проверки
    * @returns Promise с информацией о списке или ошибкой
    */
-  public async checkListExists(listTitle: string): Promise<any> {
+  public async checkListExists(listTitle: string): Promise<IListInfo> {
     try {
       const listInfo = await this._prevSiteSp.web.lists
         .getByTitle(listTitle)
@@ -70,7 +93,7 @@ export class BaseService {
    * Проверяет все необходимые списки на предыдущем сайте
    * @returns Promise с результатами проверки
    */
-  public async checkAllRequiredLists(): Promise<{ [key: string]: any }> {
+  public async checkAllRequiredLists(): Promise<IListCheckResult> {
     const requiredLists = [
       "Staff",
       "StaffGroups",
@@ -79,7 +102,7 @@ export class BaseService {
       "TypeOfWorkers"
     ];
     
-    const results: { [key: string]: any } = {};
+    const results: IListCheckResult = {};
     
     for (const listTitle of requiredLists) {
       try {

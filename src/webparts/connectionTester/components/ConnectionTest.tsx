@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { BaseService } from '../../../services/BaseService';
+import { BaseService, ISiteInfo, IListCheckResult } from '../../../services/BaseService';
 import { WebPartContext } from '@microsoft/sp-webpart-base';
 import { 
   PrimaryButton, 
@@ -22,10 +22,18 @@ export interface IConnectionTestProps {
   context: WebPartContext;
 }
 
+// Интерфейс для элементов списка в DetailsList
+interface IListItem {
+  name: string;
+  status: string;
+  itemCount: string | number;
+  details: string;
+}
+
 export const ConnectionTest: React.FC<IConnectionTestProps> = (props) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [siteInfo, setSiteInfo] = useState<any>(null);
-  const [listsInfo, setListsInfo] = useState<{ [key: string]: any } | null>(null);
+  const [siteInfo, setSiteInfo] = useState<ISiteInfo | null>(null);
+  const [listsInfo, setListsInfo] = useState<IListCheckResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [customListName, setCustomListName] = useState<string>('');
   const [prevSiteUrl, setPrevSiteUrl] = useState<string>('');
@@ -35,12 +43,9 @@ export const ConnectionTest: React.FC<IConnectionTestProps> = (props) => {
     const service = new BaseService(props.context, "ConnectionTest");
     setBaseService(service);
     
-    // Извлекаем URL предыдущего сайта из BaseService
-    // @ts-ignore - Получаем приватное поле
-    if (service && service._prevSiteUrl) {
-      // @ts-ignore
-      setPrevSiteUrl(service._prevSiteUrl);
-    }
+    // Безопасно получаем URL предыдущего сайта из BaseService
+    // Используем явное приведение типа вместо @ts-ignore
+    setPrevSiteUrl((service as any)._prevSiteUrl || '');
   }, [props.context]);
 
   // Тестирование подключения к сайту
@@ -56,7 +61,7 @@ export const ConnectionTest: React.FC<IConnectionTestProps> = (props) => {
       setSiteInfo(webInfo);
     } catch (err) {
       console.error("Connection test failed:", err);
-      setError(`Connection test failed: ${err.message || 'Unknown error'}`);
+      setError(`Connection test failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
@@ -75,7 +80,7 @@ export const ConnectionTest: React.FC<IConnectionTestProps> = (props) => {
       setListsInfo(results);
     } catch (err) {
       console.error("List check failed:", err);
-      setError(`List check failed: ${err.message || 'Unknown error'}`);
+      setError(`List check failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +104,7 @@ export const ConnectionTest: React.FC<IConnectionTestProps> = (props) => {
       setListsInfo({ [customListName]: listInfo });
     } catch (err) {
       console.error(`List check failed for "${customListName}":`, err);
-      setError(`List check failed for "${customListName}": ${err.message || 'Unknown error'}`);
+      setError(`List check failed for "${customListName}": ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
@@ -122,7 +127,7 @@ export const ConnectionTest: React.FC<IConnectionTestProps> = (props) => {
       minWidth: 100,
       maxWidth: 100,
       isResizable: true,
-      onRender: (item) => (
+      onRender: (item: IListItem) => (
         <span style={{ 
           color: item.status === 'OK' ? 'green' : 'red', 
           fontWeight: 'bold' 
@@ -149,13 +154,13 @@ export const ConnectionTest: React.FC<IConnectionTestProps> = (props) => {
   ];
 
   // Преобразуем информацию о списках в формат для DetailsList
-  const getListItems = () => {
+  const getListItems = (): IListItem[] => {
     if (!listsInfo) return [];
 
     return Object.keys(listsInfo).map(listName => {
       const info = listsInfo[listName];
       
-      if (info.error) {
+      if ('error' in info) {
         return {
           name: listName,
           status: 'Error',
