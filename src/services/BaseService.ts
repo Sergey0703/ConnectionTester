@@ -7,11 +7,11 @@ import "@pnp/sp/items";
 
 export class BaseService {
   protected _sp: SPFI;
-  protected _prevSiteSp: SPFI | null = null;
+  protected _prevSiteSp: SPFI; // Убираем null
   protected _logSource: string;
   
   // Замените на URL вашего предыдущего сайта
-  protected _prevSiteUrl: string = "https://your-previous-site.sharepoint.com/sites/YourPreviousSite";
+  protected _prevSiteUrl: string = "https://kpfaie.sharepoint.com/sites/KPFAData";
   protected _context: WebPartContext;
 
   constructor(context: WebPartContext, logSource: string) {
