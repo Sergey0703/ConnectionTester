@@ -1,0 +1,21 @@
+{
+  "@microsoft/generator-sharepoint": {
+    "plusBeta": false,
+    "isCreatingSolution": true,
+    "nodeVersion": "18.17.1",
+    "sdksVersions": {
+      "@microsoft/microsoft-graph-client": "3.0.2",
+      "@microsoft/teams-js": "2.12.0"
+    },
+    "version": "1.19.0",
+    "libraryName": "spfx-connection-test",
+    "libraryId": "7e1f9192-c1ba-4951-8d98-1b7b055396ea",
+    "environment": "spo",
+    "packageManager": "npm",
+    "solutionName": "spfx-connection-test",
+    "solutionShortDescription": "spfx-connection-test description",
+    "skipFeatureDeployment": true,
+    "isDomainIsolated": false,
+    "componentType": "webpart"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
+  "solution": {
+    "name": "spfx-connection-test-client-side-solution",
+    "id": "7e1f9192-c1ba-4951-8d98-1b7b055396ea",
+    "version": "1.0.0.0",
+    "includeClientSideAssets": true,
+    "skipFeatureDeployment": true,
+    "isDomainIsolated": false,
+    "developer": {
+      "name": "",
+      "websiteUrl": "",
+      "privacyUrl": "",
+      "termsOfUseUrl": "",
+      "mpnId": "Undefined-1.19.0"
+    },
+    "metadata": {
+      "shortDescription": {
+        "default": "spfx-connection-test description"
+      },
+      "longDescription": {
+        "default": "spfx-connection-test description"
+      },
+      "screenshotPaths": [],
+      "videoUrl": "",
+      "categories": []
+    },
+    "features": [
+      {
+        "title": "spfx-connection-test Feature",
+        "description": "The feature that activates elements of the spfx-connection-test solution.",
+        "id": "17edead0-a6c4-44a0-a12a-0a5bc9e28d0b",
+        "version": "1.0.0.0"
+      }
+    ]
+  },
+  "paths": {
+    "zippedPackage": "solution/spfx-connection-test.sppkg"
+  }
+}
