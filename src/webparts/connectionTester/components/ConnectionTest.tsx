@@ -15,7 +15,10 @@ import {
   SelectionMode,
   TextField,
   Stack,
-  StackItem
+  StackItem,
+  Dialog,
+  DialogType,
+  DialogFooter
 } from '@fluentui/react';
 
 export interface IConnectionTestProps {
@@ -38,14 +41,19 @@ export const ConnectionTest: React.FC<IConnectionTestProps> = (props) => {
   const [customListName, setCustomListName] = useState<string>('');
   const [prevSiteUrl, setPrevSiteUrl] = useState<string>('');
   const [baseService, setBaseService] = useState<BaseService | null>(null);
+  const [selectedList, setSelectedList] = useState<string | null>(null);
+  const [isDialogVisible, setIsDialogVisible] = useState<boolean>(false);
+  const [newTitleValue, setNewTitleValue] = useState<string>('Test');
+  const [updateSuccess, setUpdateSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     const service = new BaseService(props.context, "ConnectionTest");
     setBaseService(service);
     
-    // Безопасно получаем URL предыдущего сайта из BaseService
-    // Используем явное приведение типа вместо @ts-ignore
-    setPrevSiteUrl((service as any)._prevSiteUrl || '');
+    // Используем публичный метод для получения URL вместо прямого доступа к полю
+    if (service) {
+      setPrevSiteUrl(service.getPrevSiteUrl());
+    }
   }, [props.context]);
 
   // Тестирование подключения к сайту
@@ -55,13 +63,14 @@ export const ConnectionTest: React.FC<IConnectionTestProps> = (props) => {
     setIsLoading(true);
     setSiteInfo(null);
     setError(null);
+    setUpdateSuccess(null);
 
     try {
       const webInfo = await baseService.testPrevSiteConnection();
       setSiteInfo(webInfo);
     } catch (err) {
       console.error("Connection test failed:", err);
-      setError(`Connection test failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setError(`Connection test failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsLoading(false);
     }
@@ -74,13 +83,15 @@ export const ConnectionTest: React.FC<IConnectionTestProps> = (props) => {
     setIsLoading(true);
     setListsInfo(null);
     setError(null);
+    setUpdateSuccess(null);
+    setSelectedList(null);
 
     try {
       const results = await baseService.checkAllRequiredLists();
       setListsInfo(results);
     } catch (err) {
       console.error("List check failed:", err);
-      setError(`List check failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setError(`List check failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsLoading(false);
     }
@@ -97,6 +108,8 @@ export const ConnectionTest: React.FC<IConnectionTestProps> = (props) => {
 
     setIsLoading(true);
     setError(null);
+    setUpdateSuccess(null);
+    setSelectedList(null);
 
     try {
       const listInfo = await baseService.checkListExists(customListName);
@@ -104,10 +117,57 @@ export const ConnectionTest: React.FC<IConnectionTestProps> = (props) => {
       setListsInfo({ [customListName]: listInfo });
     } catch (err) {
       console.error(`List check failed for "${customListName}":`, err);
-      setError(`List check failed for "${customListName}": ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setError(`List check failed for "${customListName}": ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Обновление поля Title первого элемента списка
+  const handleUpdateItemTitle = async (): Promise<void> => {
+    if (!baseService || !selectedList) return;
+
+    setIsDialogVisible(false);
+    setIsLoading(true);
+    setError(null);
+    setUpdateSuccess(null);
+
+    try {
+      // Обновляем поле Title первого элемента
+      await baseService.updateFirstItemTitleField(selectedList, newTitleValue);
+      
+      setUpdateSuccess(`Successfully updated Title field of the first item in list "${selectedList}" to "${newTitleValue}"`);
+      
+      // Обновляем списки для отображения актуальной информации
+      await handleCheckLists();
+      
+    } catch (err) {
+      console.error(`Item update failed for "${selectedList}":`, err);
+      setError(`Failed to update item Title: ${err instanceof Error ? err.message : String(err)}`);
+      setIsLoading(false);
+    }
+  };
+
+  // Обработчик выбора списка в DetailsList
+  const handleListSelection = (item?: IListItem): void => {
+    if (item && item.status === 'OK') {
+      setSelectedList(item.name);
+    } else {
+      setSelectedList(null);
+    }
+  };
+
+  // Обработчик открытия диалога подтверждения
+  const handleOpenUpdateDialog = (): void => {
+    if (selectedList) {
+      setNewTitleValue('Test');
+      setIsDialogVisible(true);
+    }
+  };
+
+  // Обработчик закрытия диалога
+  const handleCloseDialog = (): void => {
+    setIsDialogVisible(false);
   };
 
   // Колонки для таблицы списков
@@ -175,7 +235,7 @@ export const ConnectionTest: React.FC<IConnectionTestProps> = (props) => {
         itemCount: info.ItemCount || 0,
         details: `ID: ${info.Id}`
       };
-    });
+    }) as IListItem[]; // Явное приведение типа здесь
   };
 
   return (
@@ -234,7 +294,7 @@ export const ConnectionTest: React.FC<IConnectionTestProps> = (props) => {
 
         {isLoading && (
           <Stack>
-            <Spinner size={SpinnerSize.medium} label="Testing connection..." />
+            <Spinner size={SpinnerSize.medium} label="Processing request..." />
           </Stack>
         )}
 
@@ -242,6 +302,14 @@ export const ConnectionTest: React.FC<IConnectionTestProps> = (props) => {
           <Stack>
             <MessageBar messageBarType={MessageBarType.error}>
               {error}
+            </MessageBar>
+          </Stack>
+        )}
+
+        {updateSuccess && (
+          <Stack>
+            <MessageBar messageBarType={MessageBarType.success}>
+              {updateSuccess}
             </MessageBar>
           </Stack>
         )}
@@ -262,17 +330,53 @@ export const ConnectionTest: React.FC<IConnectionTestProps> = (props) => {
 
         {listsInfo && (
           <Stack>
-            <h3>List Check Results</h3>
+            <Stack horizontal horizontalAlign="space-between" verticalAlign="center">
+              <h3>List Check Results</h3>
+              <PrimaryButton
+                text="Set 'Test' in Title field of first item"
+                onClick={handleOpenUpdateDialog}
+                disabled={!selectedList || isLoading}
+              />
+            </Stack>
             <DetailsList
               items={getListItems()}
               columns={columns}
               layoutMode={DetailsListLayoutMode.fixedColumns}
-              selectionMode={SelectionMode.none}
+              selectionMode={SelectionMode.single}
               isHeaderVisible={true}
+              onActiveItemChanged={handleListSelection}
+              getKey={(item) => item.name}
             />
+            {selectedList && (
+              <MessageBar messageBarType={MessageBarType.info}>
+                Selected list: {selectedList}
+              </MessageBar>
+            )}
           </Stack>
         )}
       </Stack>
+
+      <Dialog
+        hidden={!isDialogVisible}
+        onDismiss={handleCloseDialog}
+        dialogContentProps={{
+          type: DialogType.normal,
+          title: 'Confirm Item Update',
+          subText: `Are you sure you want to update the Title field of the first item in list "${selectedList}" to "${newTitleValue}"? This operation cannot be undone.`
+        }}
+      >
+        <Stack tokens={{ childrenGap: 15, padding: '0 0 10px 0' }}>
+          <TextField
+            label="New Title value"
+            value={newTitleValue}
+            onChange={(_, value) => setNewTitleValue(value || 'Test')}
+          />
+        </Stack>
+        <DialogFooter>
+          <PrimaryButton onClick={handleUpdateItemTitle} text="Update" />
+          <DefaultButton onClick={handleCloseDialog} text="Cancel" />
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 };
